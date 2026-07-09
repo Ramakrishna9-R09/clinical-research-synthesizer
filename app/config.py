@@ -21,11 +21,13 @@ class Settings:
 @lru_cache
 def get_settings() -> Settings:
     _load_dotenv()
+    default_data_dir = "/tmp/clinical-data" if os.getenv("VERCEL") else "./data"
+    default_report_dir = "/tmp/clinical-reports" if os.getenv("VERCEL") else "./reports"
     settings = Settings(
         app_name=os.getenv("APP_NAME", "Clinical Research Synthesizer"),
         app_env=os.getenv("APP_ENV", "local"),
-        data_dir=Path(os.getenv("DATA_DIR", "./data")),
-        report_dir=Path(os.getenv("REPORT_DIR", "./reports")),
+        data_dir=Path(os.getenv("DATA_DIR", default_data_dir)),
+        report_dir=Path(os.getenv("REPORT_DIR", default_report_dir)),
         ollama_base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
         ollama_model=os.getenv("OLLAMA_MODEL", "llama3.2:3b"),
         tavily_api_key=os.getenv("TAVILY_API_KEY") or None,
