@@ -13,6 +13,7 @@ data/*
 *.sqlite3
 *.db
 chroma/
+storage/
 .DS_Store
 Thumbs.db
 

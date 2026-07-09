@@ -9,6 +9,7 @@
 | Area | Evidence in project |
 | --- | --- |
 | RAG architecture | Semantic chunking, hybrid retrieval, reranking interface, parent metadata preservation |
+| Ingestion | PDF/text ingestion, metadata preservation, Chroma-compatible indexing |
 | Agentic workflows | Drafter, critic, adjudicator, shared state, revision loop |
 | Guardrails | Chain-of-verification, citation checks, hallucination risk proxy |
 | Evaluation | Golden dataset and evaluation smoke test |

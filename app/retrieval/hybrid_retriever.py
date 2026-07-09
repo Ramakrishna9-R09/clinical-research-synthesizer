@@ -7,6 +7,7 @@ from collections import Counter, defaultdict
 from app.retrieval.chunking import semantic_chunk_documents
 from app.retrieval.document_store import Chunk, load_documents
 from app.config import get_settings
+from app.retrieval.vector_store import VectorStore
 
 
 TOKEN_RE = re.compile(r"[a-zA-Z][a-zA-Z0-9-]+")
@@ -21,6 +22,9 @@ class HybridRetriever:
         self._tokenized = [_tokens(chunk.text) for chunk in chunks]
         self._doc_freq = Counter(term for terms in self._tokenized for term in set(terms))
         self._avg_len = sum(len(terms) for terms in self._tokenized) / max(len(self._tokenized), 1)
+        self._chunk_by_id = {chunk.id: chunk for chunk in chunks}
+        self.vector_store = VectorStore()
+        self.vector_store.upsert(chunks)
 
     def search(self, query: str, top_k: int = 8) -> list[Chunk]:
         if not self.chunks:
@@ -28,8 +32,9 @@ class HybridRetriever:
         normalized_query = _normalize_query(query)
         topic = _detect_topic(normalized_query)
         bm25 = self._bm25_scores(normalized_query)
-        dense = self._semantic_scores(normalized_query)
-        fused = _rrf_fuse([bm25, dense])
+        dense = self._dense_scores(normalized_query, top_k=max(top_k, 20))
+        lexical_semantic = self._semantic_scores(normalized_query)
+        fused = _rrf_fuse([bm25, dense, lexical_semantic])
         relevance = self._semantic_scores(normalized_query)
         ranked_indices = [
             idx
@@ -42,6 +47,15 @@ class HybridRetriever:
                 ranked_indices = topic_ranked
         ranked_indices = ranked_indices[:top_k]
         return [self.chunks[i] for i in ranked_indices]
+
+    def retrieval_diagnostics(self, query: str) -> dict:
+        normalized_query = _normalize_query(query)
+        return {
+            "backend": self.vector_store.backend,
+            "topic": _detect_topic(normalized_query),
+            "chunks_available": len(self.chunks),
+            "normalized_query": normalized_query,
+        }
 
     def _bm25_scores(self, query: str) -> dict[int, float]:
         q_terms = _tokens(query)
@@ -67,6 +81,14 @@ class HybridRetriever:
             union = len(q_terms | term_set) or 1
             scores[idx] = overlap / union
         return scores
+
+    def _dense_scores(self, query: str, top_k: int) -> dict[int, float]:
+        id_scores = dict(self.vector_store.query(query, top_k=top_k))
+        return {
+            idx: float(id_scores[chunk.id])
+            for idx, chunk in enumerate(self.chunks)
+            if chunk.id in id_scores
+        }
 
 
 def _rrf_fuse(score_maps: list[dict[int, float]], k: int = 60) -> dict[int, float]:

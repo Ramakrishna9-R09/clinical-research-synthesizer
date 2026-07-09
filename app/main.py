@@ -10,9 +10,12 @@ from pydantic import BaseModel, Field
 
 from app.graph.workflow import describe_graph, run_workflow
 from app.guardrails.hallucination_detector import estimate_hallucination_risk
+from app.observability import logger, timed_span
+from app.retrieval.hybrid_retriever import HybridRetriever
+from app.retrieval.ingestion import ingest_data_dir, ingest_text
 from app.ui_page import render_ui
 
-app = FastAPI(title="Clinical Research Synthesizer", version="0.4.0")
+app = FastAPI(title="Clinical Research Synthesizer", version="0.5.0")
 
 
 class QueryRequest(BaseModel):
@@ -23,6 +26,12 @@ class QueryRequest(BaseModel):
     approved: bool = True
 
 
+class IngestTextRequest(BaseModel):
+    title: str = Field(..., min_length=3)
+    text: str = Field(..., min_length=20)
+    metadata: dict = Field(default_factory=dict)
+
+
 @app.get("/", response_class=HTMLResponse)
 def ui() -> str:
     return render_ui()
@@ -30,7 +39,13 @@ def ui() -> str:
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "service": "clinical-research-synthesizer", "version": app.version}
+    retriever = HybridRetriever()
+    return {
+        "status": "ok",
+        "service": "clinical-research-synthesizer",
+        "version": app.version,
+        "retrieval": retriever.retrieval_diagnostics("health check"),
+    }
 
 
 @app.get("/graph")
@@ -50,20 +65,51 @@ def examples() -> dict:
     }
 
 
+@app.post("/ingest")
+def ingest() -> dict:
+    with timed_span("api.ingest"):
+        return ingest_data_dir()
+
+
+@app.post("/ingest/text")
+def ingest_text_endpoint(request: IngestTextRequest) -> dict:
+    with timed_span("api.ingest_text", title=request.title):
+        return ingest_text(request.title, request.text, request.metadata)
+
+
+@app.get("/retrieval/diagnostics")
+def retrieval_diagnostics(query: str = "Does running cause heart attacks?") -> dict:
+    retriever = HybridRetriever()
+    chunks = retriever.search(query, top_k=10)
+    return {
+        **retriever.retrieval_diagnostics(query),
+        "top_results": [
+            {
+                "title": chunk.metadata.get("title"),
+                "topic": chunk.metadata.get("topic"),
+                "study_design": chunk.metadata.get("study_design"),
+                "source": chunk.metadata.get("source"),
+            }
+            for chunk in chunks
+        ],
+    }
+
+
 @app.post("/query")
 def query(request: QueryRequest) -> dict:
     started = perf_counter()
-    state = run_workflow(
-        request.question,
-        require_human_approval=request.require_human_approval,
-        approved=request.approved,
-        analysis_mode=request.analysis_mode,
-        max_evidence=request.max_evidence,
-    )
+    with timed_span("api.query", analysis_mode=request.analysis_mode, max_evidence=request.max_evidence):
+        state = run_workflow(
+            request.question,
+            require_human_approval=request.require_human_approval,
+            approved=request.approved,
+            analysis_mode=request.analysis_mode,
+            max_evidence=request.max_evidence,
+        )
     final_report = state.get("final_report", {})
     risk = estimate_hallucination_risk(final_report.get("answer", ""), final_report.get("citations", []))
     execution_ms = round((perf_counter() - started) * 1000)
-    return {
+    payload = {
         "query": request.question,
         "analysis_mode": request.analysis_mode,
         "max_evidence_requested": request.max_evidence,
@@ -82,3 +128,5 @@ def query(request: QueryRequest) -> dict:
         "evidence_count": len(final_report.get("citations", [])),
         "report_markdown": final_report.get("report_markdown"),
     }
+    logger.info("query.completed", extra={"confidence": payload["confidence"], "evidence_count": payload["evidence_count"]})
+    return payload

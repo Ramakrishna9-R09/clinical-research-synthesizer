@@ -15,3 +15,4 @@ ollama==0.4.5
 tavily-python==0.5.0
 ragas==0.2.9
 pytest==8.3.4
+redis==5.2.1

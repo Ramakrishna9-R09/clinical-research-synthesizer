@@ -10,6 +10,8 @@ class Settings:
     app_env: str = "local"
     data_dir: Path = Path("./data")
     report_dir: Path = Path("./reports")
+    index_dir: Path = Path("./storage/chroma")
+    cache_dir: Path = Path("./storage/cache")
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.2:3b"
     tavily_api_key: str | None = None
@@ -23,11 +25,15 @@ def get_settings() -> Settings:
     _load_dotenv()
     default_data_dir = "/tmp/clinical-data" if os.getenv("VERCEL") else "./data"
     default_report_dir = "/tmp/clinical-reports" if os.getenv("VERCEL") else "./reports"
+    default_index_dir = "/tmp/clinical-index" if os.getenv("VERCEL") else "./storage/chroma"
+    default_cache_dir = "/tmp/clinical-cache" if os.getenv("VERCEL") else "./storage/cache"
     settings = Settings(
         app_name=os.getenv("APP_NAME", "Clinical Research Synthesizer"),
         app_env=os.getenv("APP_ENV", "local"),
         data_dir=Path(os.getenv("DATA_DIR", default_data_dir)),
         report_dir=Path(os.getenv("REPORT_DIR", default_report_dir)),
+        index_dir=Path(os.getenv("INDEX_DIR", default_index_dir)),
+        cache_dir=Path(os.getenv("CACHE_DIR", default_cache_dir)),
         ollama_base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
         ollama_model=os.getenv("OLLAMA_MODEL", "llama3.2:3b"),
         tavily_api_key=os.getenv("TAVILY_API_KEY") or None,
@@ -37,6 +43,8 @@ def get_settings() -> Settings:
     )
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     settings.report_dir.mkdir(parents=True, exist_ok=True)
+    settings.index_dir.mkdir(parents=True, exist_ok=True)
+    settings.cache_dir.mkdir(parents=True, exist_ok=True)
     return settings
 
 

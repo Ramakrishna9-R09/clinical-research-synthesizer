@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from app.graph.workflow import describe_graph, run_workflow
+from app.retrieval.ingestion import ingest_data_dir
 from app.retrieval.chunking import semantic_chunk_document
 from app.retrieval.document_store import ClinicalDocument
+from app.retrieval.hybrid_retriever import HybridRetriever
 
 
 def test_semantic_chunking_preserves_heading_sections():
@@ -35,3 +37,11 @@ def test_running_heart_attack_query_retrieves_exercise_evidence():
     assert "running" in titles or "exercise" in titles
     assert "sglt2" not in report["citations"][0]["title"].lower()
     assert "heart" in answer or "cardiac" in answer or "myocardial" in answer
+
+
+def test_ingestion_and_retrieval_diagnostics():
+    result = ingest_data_dir()
+    diagnostics = HybridRetriever().retrieval_diagnostics("Does running cause heart attacks?")
+    assert result["chunks_created"] >= 6
+    assert diagnostics["chunks_available"] >= 6
+    assert diagnostics["backend"] in {"chromadb", "in_memory_hash_embeddings"}

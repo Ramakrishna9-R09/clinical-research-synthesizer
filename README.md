@@ -4,7 +4,7 @@
 [![Live Demo](https://img.shields.io/badge/live-demo-0f766e)](https://clinical-research-synthesizer.vercel.app)
 [![API Docs](https://img.shields.io/badge/openapi-docs-blue)](https://clinical-research-synthesizer.vercel.app/docs)
 
-Production-style clinical multi-agent RAG system for synthesizing conflicting medical evidence with retrieval, adversarial critique, adjudication, citations, verification, and audit traces.
+Production-style clinical multi-agent RAG system for synthesizing conflicting medical evidence with PDF/text ingestion, semantic chunking, hybrid retrieval, vector indexing, adversarial critique, adjudication, citations, verification, evaluation, and audit traces.
 
 **Live demo:** [clinical-research-synthesizer.vercel.app](https://clinical-research-synthesizer.vercel.app)
 
@@ -41,6 +41,8 @@ flowchart LR
 | --- | --- |
 | Multi-agent orchestration | Drafter, critic, adjudicator, revision loop, shared state |
 | Retrieval | Heading-aware chunking, hybrid scoring, reranker abstraction |
+| Ingestion | PDF/text loader, metadata preservation, chunk indexing endpoint |
+| Vector search | ChromaDB persistence when installed, deterministic local fallback for serverless preview |
 | Hallucination control | Citation verification, risk proxy, conservative fallback |
 | Evidence grading | Study design, recency, sample size, contradiction weighting |
 | API productization | FastAPI, OpenAPI docs, typed requests, structured JSON |
@@ -79,6 +81,9 @@ Useful endpoints:
 - `GET /health` health check
 - `GET /graph` agent graph
 - `GET /examples` sample prompts
+- `POST /ingest` index local clinical documents
+- `POST /ingest/text` index text through the API
+- `GET /retrieval/diagnostics` inspect hybrid retrieval behavior
 - `POST /query` synthesis endpoint
 
 ## Local Development
@@ -100,6 +105,8 @@ Open `http://localhost:8000`.
 - **Tavily:** external contradiction search with free tier
 - **LangGraph:** checkpointed HITL workflow in `app/graph/langgraph_workflow.py`
 - **Hugging Face:** optional cross-encoder reranking
+- **ChromaDB:** persistent vector store in `storage/chroma`
+- **Redis:** production cache service in Docker Compose
 - **RAGAS:** replace the proxy evaluator with full metric scoring
 
 ## Docker
@@ -113,6 +120,12 @@ API: `http://localhost:8000`
 
 Streamlit UI: `http://localhost:8501`
 
+Run ingestion as a job:
+
+```powershell
+docker compose --profile jobs run --rm ingest
+```
+
 ## Evaluation
 
 ```powershell
@@ -120,6 +133,8 @@ python evaluation/run_ragas_eval.py
 ```
 
 The included script is a lightweight, free evaluation smoke test. For production use, connect an evaluator LLM and run full RAGAS metrics.
+
+Current deterministic metrics include faithfulness, answer relevancy, context precision, groundedness, and hallucination-rate proxy.
 
 ## Documentation
 

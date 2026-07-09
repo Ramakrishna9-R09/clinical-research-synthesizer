@@ -8,6 +8,9 @@ services:
     volumes:
       - ./data:/app/data
       - ./reports:/app/reports
+      - ./storage:/app/storage
+    depends_on:
+      - redis
 
   ui:
     build: .
@@ -20,3 +23,20 @@ services:
       - "8501:8501"
     depends_on:
       - api
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --save 60 1 --loglevel warning
+
+  ingest:
+    build: .
+    command: python -c "from app.retrieval.ingestion import ingest_data_dir; print(ingest_data_dir())"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./storage:/app/storage
+    profiles:
+      - jobs
