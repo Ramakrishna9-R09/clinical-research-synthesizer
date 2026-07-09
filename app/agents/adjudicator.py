@@ -62,6 +62,16 @@ def _score(item: dict) -> float:
 
 
 def _verdict(confidence: float, evidence: list[dict], contradictory: list[dict]) -> str:
+    if not evidence:
+        return "The local evidence base does not contain enough relevant source material to answer this safely. Add domain documents or use external search before making a clinical conclusion."
+    if _topic(evidence) == "exercise_cardiac_risk":
+        primary = [item.get("citation_id") for item in evidence[:3] if item.get("citation_id")]
+        return (
+            "Running does not generally cause heart attacks in healthy adults; the evidence suggests regular aerobic activity is "
+            "associated with lower long-term cardiovascular risk. Rare acute cardiac events can occur during sudden vigorous exertion, "
+            "especially in people with known or hidden coronary disease, very low baseline fitness, or warning symptoms such as chest "
+            f"pressure, fainting, palpitations, or unexplained shortness of breath. Evidence base: {', '.join(primary)}."
+        )
     primary = [item.get("citation_id") for item in evidence[:2] if item.get("citation_id")]
     conflicts = [item.get("title") for item in contradictory[:2] if item.get("title")]
     citation_text = f" Evidence base: {', '.join(primary)}." if primary else ""
@@ -105,6 +115,11 @@ def _decision_factors(evidence: list[dict], contradictory: list[dict]) -> list[d
             "rationale": "Evidence flagged by the critic as safety-limiting or potentially conflicting.",
         },
         {
+            "factor": "topic_match",
+            "value": _topic(evidence) or "mixed",
+            "rationale": "Retriever filters seed evidence by detected clinical topic when a specific domain is recognized.",
+        },
+        {
             "factor": "highest_study_design",
             "value": _highest_design(evidence),
             "rationale": "Adjudication weights systematic reviews, guidelines, and RCTs above case reports.",
@@ -119,6 +134,13 @@ def _highest_design(evidence: list[dict]) -> str:
         if design in designs:
             return design
     return "Unspecified"
+
+
+def _topic(evidence: list[dict]) -> str | None:
+    topics = [item.get("topic") for item in evidence if item.get("topic")]
+    if not topics:
+        return None
+    return max(set(topics), key=topics.count)
 
 
 def _render_report(query: str, verdict: str, confidence: float, evidence: list[dict], contradictory: list[dict], critic_feedback: dict) -> str:

@@ -45,6 +45,7 @@ def _citation(chunk, citation_number: int) -> dict:
         "publication_year": metadata.get("publication_year") or _coerce_year(metadata.get("publication_date")),
         "sample_size": metadata.get("sample_size"),
         "study_design": metadata.get("study_design", "Unspecified"),
+        "topic": metadata.get("topic"),
         "text": chunk.text,
     }
 

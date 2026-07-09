@@ -25,3 +25,13 @@ def test_graph_description_documents_agent_loop():
     graph = describe_graph()
     assert graph["nodes"] == ["drafter", "critic", "adjudicator"]
     assert any(edge["from"] == "critic" and edge["to"] == "drafter" for edge in graph["edges"])
+
+
+def test_running_heart_attack_query_retrieves_exercise_evidence():
+    state = run_workflow("running causses heart attack")
+    report = state["final_report"]
+    titles = " ".join(citation["title"].lower() for citation in report["citations"])
+    answer = report["answer"].lower()
+    assert "running" in titles or "exercise" in titles
+    assert "sglt2" not in report["citations"][0]["title"].lower()
+    assert "heart" in answer or "cardiac" in answer or "myocardial" in answer

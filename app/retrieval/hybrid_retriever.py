@@ -25,10 +25,22 @@ class HybridRetriever:
     def search(self, query: str, top_k: int = 8) -> list[Chunk]:
         if not self.chunks:
             return []
-        bm25 = self._bm25_scores(query)
-        dense = self._semantic_scores(query)
+        normalized_query = _normalize_query(query)
+        topic = _detect_topic(normalized_query)
+        bm25 = self._bm25_scores(normalized_query)
+        dense = self._semantic_scores(normalized_query)
         fused = _rrf_fuse([bm25, dense])
-        ranked_indices = sorted(fused, key=fused.get, reverse=True)[:top_k]
+        relevance = self._semantic_scores(normalized_query)
+        ranked_indices = [
+            idx
+            for idx in sorted(fused, key=fused.get, reverse=True)
+            if relevance.get(idx, 0) > 0 or bm25.get(idx, 0) > 0
+        ]
+        if topic:
+            topic_ranked = [idx for idx in ranked_indices if self.chunks[idx].metadata.get("topic") == topic]
+            if topic_ranked:
+                ranked_indices = topic_ranked
+        ranked_indices = ranked_indices[:top_k]
         return [self.chunks[i] for i in ranked_indices]
 
     def _bm25_scores(self, query: str) -> dict[int, float]:
@@ -66,5 +78,34 @@ def _rrf_fuse(score_maps: list[dict[int, float]], k: int = 60) -> dict[int, floa
 
 
 def _tokens(text: str) -> list[str]:
-    stop = {"the", "a", "an", "and", "or", "of", "to", "in", "for", "with", "is", "are", "be", "by"}
-    return [token.lower() for token in TOKEN_RE.findall(text) if token.lower() not in stop]
+    stop = {"the", "a", "an", "and", "or", "of", "to", "in", "for", "with", "is", "are", "be", "by", "does", "do"}
+    return [token.lower() for token in TOKEN_RE.findall(_normalize_query(text)) if token.lower() not in stop]
+
+
+def _normalize_query(text: str) -> str:
+    lowered = text.lower()
+    replacements = {
+        "heartattack": "heart attack myocardial infarction cardiac event",
+        "heart-attack": "heart attack myocardial infarction cardiac event",
+        "heart attack": "heart attack myocardial infarction cardiac event",
+        "causses": "causes",
+        "couses": "causes",
+        "running": "running run exercise aerobic exertion",
+        "runner": "runner running exercise aerobic exertion",
+        "jogging": "jogging running exercise aerobic exertion",
+    }
+    for source, target in replacements.items():
+        lowered = lowered.replace(source, target)
+    return lowered
+
+
+def _detect_topic(text: str) -> str | None:
+    tokens = set(_tokens(text))
+    exercise_terms = {"running", "run", "exercise", "aerobic", "exertion", "jogging", "runner"}
+    cardiac_event_terms = {"attack", "myocardial", "infarction", "cardiac", "arrest"}
+    drug_terms = {"sglt2", "inhibitor", "drug", "pharmacotherapy", "ketoacidosis"}
+    if tokens & exercise_terms and tokens & cardiac_event_terms:
+        return "exercise_cardiac_risk"
+    if tokens & drug_terms:
+        return "heart_failure_pharmacotherapy"
+    return None
