@@ -12,7 +12,7 @@ class AdjudicatorAgent:
         evidence = state.get("research_data", [])
         contradictory = state.get("contradictory_evidence", [])
         score = _confidence(evidence, contradictory)
-        verdict = _verdict(score)
+        verdict = _verdict(score, evidence, contradictory)
         report_md = _render_report(state["query"], verdict, score, evidence, contradictory, state.get("critic_feedback", {}))
         verification = verify_report(report_md, evidence)
         if not verification["is_verified"]:
@@ -25,6 +25,8 @@ class AdjudicatorAgent:
             "contradictory_evidence": contradictory,
             "report_markdown": report_md,
             "verification": verification,
+            "evidence_grade": _evidence_grade(score),
+            "decision_factors": _decision_factors(evidence, contradictory),
         }
         report_path = _save_report(report_md)
         report["report_path"] = str(report_path)
@@ -59,12 +61,64 @@ def _score(item: dict) -> float:
     return weight * max(0.5, min(2.0, (year - 2000) / 12)) * min(4.0, max(1.0, sample ** 0.25))
 
 
-def _verdict(confidence: float) -> str:
+def _verdict(confidence: float, evidence: list[dict], contradictory: list[dict]) -> str:
+    primary = [item.get("citation_id") for item in evidence[:2] if item.get("citation_id")]
+    conflicts = [item.get("title") for item in contradictory[:2] if item.get("title")]
+    citation_text = f" Evidence base: {', '.join(primary)}." if primary else ""
+    conflict_text = f" Conflicting or safety-limiting evidence reviewed: {'; '.join(conflicts)}." if conflicts else ""
     if confidence >= 0.8:
-        return "Evidence supports the recommendation with standard monitoring and patient-specific contraindication review."
+        return (
+            "Evidence supports the recommendation for patients matching source eligibility, with standard monitoring and "
+            f"patient-specific contraindication review.{citation_text}{conflict_text}"
+        )
     if confidence >= 0.55:
-        return "Evidence is mixed or incomplete; use shared decision-making and document uncertainty."
-    return "Evidence is insufficient for a confident recommendation; seek specialist review or stronger source material."
+        return (
+            "Evidence is directionally supportive but safety constraints or source limitations require shared decision-making, "
+            f"monitoring, and documentation of uncertainty.{citation_text}{conflict_text}"
+        )
+    return (
+        "Evidence is insufficient for a confident recommendation; seek specialist review or stronger source material."
+        f"{citation_text}{conflict_text}"
+    )
+
+
+def _evidence_grade(confidence: float) -> str:
+    if confidence >= 0.85:
+        return "high"
+    if confidence >= 0.65:
+        return "moderate"
+    if confidence >= 0.45:
+        return "low"
+    return "insufficient"
+
+
+def _decision_factors(evidence: list[dict], contradictory: list[dict]) -> list[dict]:
+    return [
+        {
+            "factor": "supporting_sources",
+            "value": len(evidence),
+            "rationale": "Retrieved, reranked evidence items used by the drafter and adjudicator.",
+        },
+        {
+            "factor": "contradictory_sources",
+            "value": len(contradictory),
+            "rationale": "Evidence flagged by the critic as safety-limiting or potentially conflicting.",
+        },
+        {
+            "factor": "highest_study_design",
+            "value": _highest_design(evidence),
+            "rationale": "Adjudication weights systematic reviews, guidelines, and RCTs above case reports.",
+        },
+    ]
+
+
+def _highest_design(evidence: list[dict]) -> str:
+    order = ["Systematic review", "Guideline", "RCT", "Case report", "Unspecified"]
+    designs = {str(item.get("study_design", "Unspecified")) for item in evidence}
+    for design in order:
+        if design in designs:
+            return design
+    return "Unspecified"
 
 
 def _render_report(query: str, verdict: str, confidence: float, evidence: list[dict], contradictory: list[dict], critic_feedback: dict) -> str:
@@ -85,6 +139,11 @@ def _render_report(query: str, verdict: str, confidence: float, evidence: list[d
             f"## Final Verdict\n{verdict}",
             "",
             f"## Confidence\n{confidence:.2f}",
+            "",
+            "## Decision Factors",
+            f"- Supporting sources: {len(evidence)}",
+            f"- Contradictory or safety-limiting sources: {len(contradictory)}",
+            f"- Strongest evidence design: {_highest_design(evidence)}",
             "",
             "## Supporting Evidence",
             *evidence_lines,
