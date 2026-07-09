@@ -105,12 +105,12 @@ def extract_metadata_from_text(text: str) -> dict[str, str | int]:
     if sample:
         metadata["sample_size"] = int(sample.group(1).replace(",", ""))
     lower = text.lower()
-    if "randomized" in lower or "rct" in lower:
-        metadata["study_design"] = "RCT"
-    elif "meta-analysis" in lower or "systematic review" in lower:
-        metadata["study_design"] = "Systematic review"
+    if "case report" in lower:
+        metadata["study_design"] = "Case report"
     elif "guideline" in lower or "recommendation" in lower:
         metadata["study_design"] = "Guideline"
-    elif "case report" in lower:
-        metadata["study_design"] = "Case report"
+    elif "meta-analysis" in lower or "systematic review" in lower:
+        metadata["study_design"] = "Systematic review"
+    elif "randomized" in lower or "rct" in lower:
+        metadata["study_design"] = "RCT"
     return metadata
