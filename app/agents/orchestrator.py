@@ -13,8 +13,21 @@ class ClinicalOrchestrator:
         self.adjudicator = AdjudicatorAgent()
         self.max_revisions = max_revisions
 
-    def run(self, query: str, require_human_approval: bool = False, approved: bool = True) -> AgentState:
-        state: AgentState = {"query": query, "revision_count": 0, "audit_log": []}
+    def run(
+        self,
+        query: str,
+        require_human_approval: bool = False,
+        approved: bool = True,
+        analysis_mode: str = "auto",
+        max_evidence: int = 12,
+    ) -> AgentState:
+        state: AgentState = {
+            "query": query,
+            "analysis_mode": analysis_mode,
+            "max_evidence": max(1, min(max_evidence, 100)),
+            "revision_count": 0,
+            "audit_log": [],
+        }
         while True:
             state = self.drafter.run(state)
             state = self.critic.run(state)

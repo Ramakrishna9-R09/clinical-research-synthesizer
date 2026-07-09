@@ -4,8 +4,20 @@ from app.agents.orchestrator import ClinicalOrchestrator
 from app.graph.state import AgentState
 
 
-def run_workflow(query: str, require_human_approval: bool = False, approved: bool = True) -> AgentState:
-    return ClinicalOrchestrator().run(query, require_human_approval=require_human_approval, approved=approved)
+def run_workflow(
+    query: str,
+    require_human_approval: bool = False,
+    approved: bool = True,
+    analysis_mode: str = "auto",
+    max_evidence: int = 12,
+) -> AgentState:
+    return ClinicalOrchestrator().run(
+        query,
+        require_human_approval=require_human_approval,
+        approved=approved,
+        analysis_mode=analysis_mode,
+        max_evidence=max_evidence,
+    )
 
 
 def describe_graph() -> dict:

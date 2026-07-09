@@ -14,8 +14,10 @@ class DrafterAgent:
 
     def run(self, state: AgentState) -> AgentState:
         query = state["query"]
-        candidates = self.retriever.search(query, top_k=20)
-        chunks = self.reranker.rerank(query, candidates, top_k=5)
+        max_evidence = max(1, min(int(state.get("max_evidence", 12)), 100))
+        retrieval_query = _mode_expanded_query(query, state.get("analysis_mode", "auto"))
+        candidates = self.retriever.search(retrieval_query, top_k=max(20, max_evidence))
+        chunks = self.reranker.rerank(retrieval_query, candidates, top_k=max_evidence)
         citations = [_citation(chunk, index + 1) for index, chunk in enumerate(chunks)]
         evidence = "\n\n".join(f"[{item['citation_id']}] {item['text']}" for item in citations)
         prompt = (
@@ -30,7 +32,16 @@ class DrafterAgent:
             "retrieved_chunks": citations,
             "research_data": citations,
             "draft": draft,
-            "audit_log": [*state.get("audit_log", []), {"agent": "drafter", "citations": [c["citation_id"] for c in citations]}],
+            "audit_log": [
+                *state.get("audit_log", []),
+                {
+                    "agent": "drafter",
+                    "analysis_mode": state.get("analysis_mode", "auto"),
+                    "requested_evidence": max_evidence,
+                    "retrieved_evidence": len(citations),
+                    "citations": [c["citation_id"] for c in citations],
+                },
+            ],
         }
 
 
@@ -63,3 +74,13 @@ def _coerce_year(value):
         return int(str(value)[:4])
     except Exception:
         return None
+
+
+def _mode_expanded_query(query: str, analysis_mode: str | None) -> str:
+    mode_terms = {
+        "monitoring": "monitoring follow-up adverse effects safety labs warning symptoms contraindications",
+        "conflict": "contradictory evidence conflicting studies adverse events contraindications no benefit harm",
+        "safety": "risk safety adverse events contraindications warning symptoms emergency red flags",
+        "evidence_map": "guideline randomized trial systematic review meta-analysis observational registry evidence",
+    }
+    return f"{query} {mode_terms.get(analysis_mode or 'auto', '')}".strip()

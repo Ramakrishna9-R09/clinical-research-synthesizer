@@ -117,6 +117,51 @@ def seed_documents() -> list[ClinicalDocument]:
             "Safety\nAbrupt high-intensity exertion can transiently increase cardiac demand, so gradual progression and symptom-based screening are recommended. "
             "Conclusion\nThe balance of evidence supports regular running or aerobic exercise for prevention when tailored to fitness and medical history.",
         ),
+        (
+            "Pre-participation cardiovascular screening guideline, 2024",
+            "exercise_cardiac_risk",
+            "Recommendation\nAdults starting vigorous running after long inactivity should use gradual progression and consider clinical screening if they have cardiovascular disease, diabetes, kidney disease, chest pain, syncope, or concerning exertional symptoms. "
+            "Evidence basis\nGuidance emphasizes symptom review and risk stratification rather than routine testing for every healthy adult. "
+            "Conclusion\nRisk assessment should be targeted to symptoms and baseline cardiovascular risk.",
+        ),
+        (
+            "Dose response of running and cardiovascular outcomes cohort, 2022",
+            "exercise_cardiac_risk",
+            "Background\nA prospective cohort evaluated running frequency, duration, and cardiovascular mortality. "
+            "Methods\nObservational cohort, sample size n=55000 adults. "
+            "Results\nEven low weekly running exposure was associated with lower cardiovascular mortality compared with no running, while abrupt excessive intensity offered no clear additional safety advantage. "
+            "Conclusion\nConsistent moderate running appears beneficial for long-term cardiovascular prevention.",
+        ),
+        (
+            "Emergency symptoms during exercise clinical review, 2025",
+            "exercise_cardiac_risk",
+            "Background\nA clinical review summarized red flags during exercise. "
+            "Recommendation\nStop running and seek urgent medical assessment for chest pressure, pain radiating to the arm or jaw, fainting, severe unexplained shortness of breath, new neurologic symptoms, or sustained palpitations. "
+            "Conclusion\nSymptoms during exertion should be treated differently from normal training fatigue.",
+        ),
+        (
+            "SGLT2 inhibitor heart failure meta-analysis, 2025",
+            "heart_failure_pharmacotherapy",
+            "Background\nA systematic review and meta-analysis pooled randomized trials of SGLT2 inhibitors in adults with heart failure. "
+            "Methods\nSystematic review and meta-analysis, sample size n=21000 adults. "
+            "Results\nTherapy was associated with reduced heart-failure hospitalization, with similar direction of effect across several patient subgroups. "
+            "Safety\nVolume depletion and genital infections required monitoring. "
+            "Conclusion\nThe pooled evidence supports use in eligible patients with monitoring.",
+        ),
+        (
+            "Renal monitoring after SGLT2 inhibitor initiation guideline, 2024",
+            "heart_failure_pharmacotherapy",
+            "Recommendation\nCheck baseline renal function and volume status before SGLT2 inhibitor initiation. "
+            "Monitoring\nReassess renal function, blood pressure, dehydration symptoms, infection symptoms, and sick-day medication instructions after starting therapy. "
+            "Conclusion\nMonitoring is practical and should be individualized to comorbidity and concomitant diuretic use.",
+        ),
+        (
+            "SGLT2 inhibitor contraindication safety bulletin, 2025",
+            "heart_failure_pharmacotherapy",
+            "Safety\nAvoid SGLT2 inhibitors in active ketoacidosis, severe hypersensitivity, or situations with high dehydration risk. "
+            "Recommendation\nPause therapy around prolonged fasting, major surgery, or severe acute illness when ketoacidosis risk is elevated. "
+            "Conclusion\nContraindication screening and patient education reduce preventable adverse events.",
+        ),
     ]
     return [
         ClinicalDocument(

@@ -236,6 +236,33 @@ def render_ui() -> str:
     .secondary { background: #e8f3f1; color: #0a5c55; border: 1px solid #b6d8d2; text-align: left; }
     .ghost { background: #f3f6f8; color: var(--ink); border: 1px solid var(--line); }
     .button-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .control-grid { display: grid; gap: 12px; }
+    .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .mode-card {
+      min-height: 64px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fbfc;
+      padding: 10px;
+      text-align: left;
+      cursor: pointer;
+      color: var(--ink);
+    }
+    .mode-card strong { display: block; font-size: 13px; margin-bottom: 4px; }
+    .mode-card span { display: block; color: var(--muted); font-size: 12px; line-height: 1.35; }
+    .mode-card.active { border-color: var(--teal); background: var(--teal-2); box-shadow: 0 0 0 3px rgba(15, 118, 110, .10); }
+    .scope-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+    input[type="range"] { width: 100%; accent-color: var(--teal); }
+    .toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+      user-select: none;
+    }
+    .toggle input { width: 16px; height: 16px; accent-color: var(--teal); }
     .status-line {
       min-height: 38px;
       display: flex;
@@ -390,10 +417,10 @@ def render_ui() -> str:
               agent trace, latency, and final report instead of hiding the system behind a chatbot box.
             </p>
             <div class="hero-metrics">
-              <div class="mini-metric"><span>Workflow</span><strong>3 agents</strong></div>
+              <div class="mini-metric"><span>Modes</span><strong>5 workflows</strong></div>
               <div class="mini-metric"><span>Guardrail</span><strong>Citation check</strong></div>
+              <div class="mini-metric"><span>Evidence</span><strong>All matching</strong></div>
               <div class="mini-metric"><span>Deploy</span><strong>Vercel API</strong></div>
-              <div class="mini-metric"><span>Cost</span><strong>Free stack</strong></div>
             </div>
           </div>
           <div class="workflow-card">
@@ -417,12 +444,28 @@ def render_ui() -> str:
               <div class="query-box">
                 <label for="question">Question</label>
                 <textarea id="question">Should eligible adults with heart failure receive an SGLT2 inhibitor?</textarea>
+                <div class="control-grid">
+                  <label>Analysis mode</label>
+                  <div class="mode-grid" id="mode-grid">
+                    <button class="mode-card active" type="button" data-mode="auto"><strong>Auto triage</strong><span>Detect intent and route evidence.</span></button>
+                    <button class="mode-card" type="button" data-mode="monitoring"><strong>Monitoring</strong><span>Follow-up, warning signs, labs.</span></button>
+                    <button class="mode-card" type="button" data-mode="conflict"><strong>Conflict review</strong><span>Challenge the first answer.</span></button>
+                    <button class="mode-card" type="button" data-mode="safety"><strong>Safety/Risk</strong><span>Red flags and contraindications.</span></button>
+                    <button class="mode-card" type="button" data-mode="evidence_map"><strong>Evidence map</strong><span>Broad source landscape.</span></button>
+                  </div>
+                  <label for="evidence-limit">Evidence scope: <span id="evidence-label">12 sources</span></label>
+                  <div class="scope-row">
+                    <input id="evidence-limit" type="range" min="3" max="100" step="1" value="12" />
+                    <label class="toggle"><input id="all-evidence" type="checkbox" checked /> All matching</label>
+                  </div>
+                </div>
                 <div class="button-row">
                   <button class="primary" id="run">Run multi-agent synthesis</button>
                   <div class="button-grid">
-                    <button class="secondary example" data-q="What should clinicians monitor after starting an SGLT2 inhibitor?">Use monitoring example</button>
-                    <button class="secondary example" data-q="Does one ketoacidosis case report outweigh randomized heart failure trial evidence?">Use conflict example</button>
-                    <button class="secondary example" data-q="What does the evidence say about SGLT2 inhibitor safety tradeoffs in heart failure?">Use safety tradeoff example</button>
+                    <button class="secondary example" data-mode="monitoring" data-q="What should clinicians monitor after starting an SGLT2 inhibitor?">Use monitoring example</button>
+                    <button class="secondary example" data-mode="conflict" data-q="Does one ketoacidosis case report outweigh randomized heart failure trial evidence?">Use conflict example</button>
+                    <button class="secondary example" data-mode="safety" data-q="Does running cause heart attacks?">Use running cardiac-risk example</button>
+                    <button class="secondary example" data-mode="evidence_map" data-q="What does the evidence say about SGLT2 inhibitor safety tradeoffs in heart failure?">Use evidence-map example</button>
                   </div>
                 </div>
                 <p class="footer-note">
@@ -438,6 +481,8 @@ def render_ui() -> str:
               <div class="metric"><span>Evidence Grade</span><strong id="grade">--</strong></div>
               <div class="metric"><span>Verification</span><strong id="verification">--</strong></div>
               <div class="metric"><span>Latency</span><strong id="latency">--</strong></div>
+              <div class="metric"><span>Evidence Count</span><strong id="evidence-count">--</strong></div>
+              <div class="metric"><span>Mode</span><strong id="mode-readout">Auto</strong></div>
             </div>
             <div class="panel">
               <div class="panel-head">
@@ -480,6 +525,10 @@ def render_ui() -> str:
     const statusEl = document.getElementById("status");
     const statusDot = document.getElementById("status-dot");
     const question = document.getElementById("question");
+    let selectedMode = "auto";
+    const evidenceLimit = document.getElementById("evidence-limit");
+    const evidenceLabel = document.getElementById("evidence-label");
+    const allEvidence = document.getElementById("all-evidence");
     const stageMap = {
       drafter: document.getElementById("stage-drafter"),
       critic: document.getElementById("stage-critic"),
@@ -491,14 +540,26 @@ def render_ui() -> str:
       adjudicator: document.getElementById("copy-adjudicator")
     };
     document.querySelectorAll(".example").forEach(button => {
-      button.addEventListener("click", () => { question.value = button.dataset.q; question.focus(); });
+      button.addEventListener("click", () => {
+        question.value = button.dataset.q;
+        chooseMode(button.dataset.mode || "auto");
+        question.focus();
+      });
     });
+    document.querySelectorAll(".mode-card").forEach(button => {
+      button.addEventListener("click", () => chooseMode(button.dataset.mode));
+    });
+    evidenceLimit.addEventListener("input", updateEvidenceLabel);
+    allEvidence.addEventListener("change", updateEvidenceLabel);
+    updateEvidenceLabel();
     document.getElementById("sample-monitor").addEventListener("click", () => {
       question.value = "What should clinicians monitor after starting an SGLT2 inhibitor?";
+      chooseMode("monitoring");
       run.click();
     });
     document.getElementById("sample-conflict").addEventListener("click", () => {
       question.value = "Does one ketoacidosis case report outweigh randomized heart failure trial evidence?";
+      chooseMode("conflict");
       run.click();
     });
     document.querySelectorAll(".tab").forEach(button => {
@@ -512,10 +573,14 @@ def render_ui() -> str:
     run.addEventListener("click", async () => {
       setBusy();
       try {
-        const response = await fetch("/query?v=3", {
+        const response = await fetch("/query?v=4", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question: question.value })
+          body: JSON.stringify({
+            question: question.value,
+            analysis_mode: selectedMode,
+            max_evidence: allEvidence.checked ? 100 : Number(evidenceLimit.value)
+          })
         });
         if (!response.ok) throw new Error(await response.text());
         const data = await response.json();
@@ -554,6 +619,8 @@ def render_ui() -> str:
       document.getElementById("grade").textContent = data.evidence_grade || "--";
       document.getElementById("verification").textContent = data.verification?.is_verified ? "Verified" : "Warnings";
       document.getElementById("latency").textContent = data.execution_ms ? `${data.execution_ms} ms` : "--";
+      document.getElementById("evidence-count").textContent = data.evidence_count ?? "--";
+      document.getElementById("mode-readout").textContent = formatLabel(data.analysis_mode || selectedMode);
       const risk = data.hallucination_risk?.risk || "pending";
       const riskChip = document.getElementById("risk-chip");
       riskChip.textContent = `Hallucination risk: ${risk}`;
@@ -624,6 +691,17 @@ def render_ui() -> str:
           <span><pre>${escapeHtml(JSON.stringify(item, null, 2))}</pre></span>
         </div>
       `).join("");
+    }
+    function chooseMode(mode) {
+      selectedMode = mode || "auto";
+      document.querySelectorAll(".mode-card").forEach(card => {
+        card.classList.toggle("active", card.dataset.mode === selectedMode);
+      });
+      document.getElementById("mode-readout").textContent = formatLabel(selectedMode);
+    }
+    function updateEvidenceLabel() {
+      evidenceLimit.disabled = allEvidence.checked;
+      evidenceLabel.textContent = allEvidence.checked ? "all matching sources" : `${evidenceLimit.value} sources`;
     }
     function formatLabel(value) {
       return String(value ?? "").replace(/_/g, " ").replace(/\\b\\w/g, char => char.toUpperCase());
