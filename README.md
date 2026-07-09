@@ -36,6 +36,7 @@ flowchart LR
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+pip install -r requirements-full.txt
 copy .env.example .env
 pytest
 uvicorn app.main:app --reload
@@ -92,3 +93,11 @@ The script prints lightweight proxy metrics by default. You can replace it with 
 ## Safety
 
 This project is for evidence synthesis and portfolio demonstration. It is not a medical device, does not diagnose or treat patients, and must be reviewed by qualified clinicians before any real clinical use.
+
+## Vercel API deploy
+
+The root `requirements.txt` is intentionally minimal for Vercel serverless deployment. Use `requirements-full.txt` for local UI, Docker, evaluation, and optional ML integrations.
+
+```powershell
+vercel --prod
+```
