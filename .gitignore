@@ -1,0 +1,17 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.streamlit/secrets.toml
+reports/*.md
+data/*
+!data/.gitkeep
+*.sqlite3
+*.db
+chroma/
+.DS_Store
+Thumbs.db
